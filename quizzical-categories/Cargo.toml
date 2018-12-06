@@ -1,0 +1,15 @@
+[package]
+name = "quizzical-categories"
+version = "0.1.0"
+authors = ["Waqqas Sheikh <waqqas.abdulkareem@gmail.com>"]
+
+[dependencies]
+lambda_runtime = "0.1.0"
+log = "0.4.6"
+simple_logger = "1.0.1"
+serde = "1.0.75"
+serde_derive = "1.0.75"
+serde_json = "1.0.26"
+
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
