@@ -11,5 +11,5 @@ serde = "1.0.75"
 serde_derive = "1.0.75"
 serde_json = "1.0.26"
 
-[target.x86_64-unknown-linux-musl]
-linker = "x86_64-linux-musl-gcc"
+[[bin]]
+name = "bootstrap"
