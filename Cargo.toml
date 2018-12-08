@@ -14,4 +14,8 @@ postgres = "0.15"
 
 [[bin]]
 name = "categories"
-path = "src/categories.rs"
+path = "src/categories_lambda.rs"
+
+[[bin]]
+name = "questions"
+path = "src/questions_lambda.rs"

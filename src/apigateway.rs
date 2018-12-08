@@ -2,10 +2,13 @@ use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_str, to_string, Error as JSONError};
 use std::collections::HashMap;
+use std::str::FromStr;
 
 #[derive(Serialize, Deserialize)]
 pub struct APIGatewayEvent {
     pub path: String,
+    #[serde(rename = "queryStringParameters")]
+    pub query: Option<HashMap<String, String>>,
     pub body: Option<String>,
 }
 
@@ -17,6 +20,16 @@ impl APIGatewayEvent {
         match self.body {
             Some(ref body) => from_str(body),
             None => Ok(None),
+        }
+    }
+
+    pub fn get_query<T>(&self, name: &str) -> Option<T>
+    where
+        T: FromStr,
+    {
+        match self.query {
+            Some(ref query) => query.get(name).and_then(|value| T::from_str(value).ok()),
+            None => None,
         }
     }
 }
