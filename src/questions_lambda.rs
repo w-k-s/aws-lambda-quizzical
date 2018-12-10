@@ -38,7 +38,10 @@ fn questions_handler(
     let conn = connect_db_using_env_var("CONN_STRING")
         .map_err(|e| c.new_error(&format!("Connection Error: {}", e)))?;
 
-    let (questions, total) = QuestionsRepository { conn: conn }
+    let repository = QuestionsRepository { conn: conn };
+    let total = repository.count_questions(&category)
+        .map_err(|e| c.new_error(&format!("Error on count_questions: {}", e)))?;
+    let questions = repository
         .get_questions(&category, page, size)
         .map_err(|e| c.new_error(&format!("Error on get_questions: {}", e)))?;
 

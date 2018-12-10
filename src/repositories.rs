@@ -50,17 +50,8 @@ pub struct QuestionsRepository {
 type TotalRecordsCount = i64;
 
 impl QuestionsRepository {
-    pub fn get_questions(
-        &self,
-        category: &str,
-        page: i64,
-        size: i64,
-    ) -> Result<(Vec<Question>, TotalRecordsCount), RepositoryError> {
-        let offset = match page {
-            0 => 0i64,
-            _ => (page - 1i64) * size,
-        };
 
+    pub fn count_questions(&self,category: &str) -> Result<i64, RepositoryError> {
         let count_rows = &self
             .conn
             .query(
@@ -75,11 +66,24 @@ impl QuestionsRepository {
                 RepositoryError::DatabaseError(format!("{}", e))
             })?;
 
-        if count_rows.is_empty() {
-            return Ok((vec![], 0));
-        }
+        let count : i64 = match count_rows.is_empty(){
+            true => 0i64,
+            false => count_rows.get(0).get(0)
+        };
 
-        let count: i64 = count_rows.get(0).get(0);
+        Ok(count)
+    }
+
+    pub fn get_questions(
+        &self,
+        category: &str,
+        page: i64,
+        size: i64,
+    ) -> Result<Vec<Question>, RepositoryError> {
+        let offset = match page {
+            0 => 0i64,
+            _ => (page - 1i64) * size,
+        };
 
         let question_rows = &self
             .conn
@@ -98,12 +102,10 @@ impl QuestionsRepository {
             question_ids.push(id);
         }
 
-        info!("Loading choices for questions '{:?}'", question_ids);
-
         let choices_rows = &self
             .conn
             .query(
-                "SELECT text,correct,question_id FROM choices WHERE question_id = ANY($1)",
+                "SELECT id,text,correct,question_id FROM choices WHERE question_id = ANY($1)",
                 &[&question_ids],
             )
             .map_err(|e| {
@@ -116,10 +118,11 @@ impl QuestionsRepository {
 
         let mut choices_map: HashMap<i64, Vec<Choice>> = HashMap::new();
         for choice_row in choices_rows {
-            let question_id: i64 = choice_row.get(2);
+            let question_id: i64 = choice_row.get(3);
             let choice = Choice {
-                title: choice_row.get(0),
-                correct: choice_row.get(1),
+                id: choice_row.get(0),
+                title: choice_row.get(1),
+                correct: choice_row.get(2),
             };
 
             if let Some(mut choices) = choices_map.get_mut(&question_id) {
@@ -144,6 +147,6 @@ impl QuestionsRepository {
             });
         }
 
-        Ok((questions, count))
+        Ok(questions)
     }
 }

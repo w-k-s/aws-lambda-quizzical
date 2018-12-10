@@ -16,6 +16,7 @@ pub struct Categories {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Choice {
+    pub id: i64,
     pub title: String,
     pub correct: bool,
 }
