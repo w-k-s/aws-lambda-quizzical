@@ -4,6 +4,7 @@ mod models;
 mod repositories;
 mod responses;
 
+extern crate http;
 extern crate lambda_runtime as lambda;
 extern crate log;
 extern crate postgres;
@@ -14,36 +15,39 @@ extern crate simple_logger;
 
 use apigateway::*;
 use connection::connect_db_using_env_var;
-use lambda::{error::HandlerError, lambda, Context};
+use http::StatusCode;
+use lambda::{start, Context};
 use repositories::QuestionsRepository;
 use responses::PaginatedResponse;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
-    lambda!(questions_handler);
+    start(
+        |event: APIGatewayEvent, c: Context| lambda_adapter(event, c, &questions_handler),
+        None,
+    );
     Ok(())
 }
 
-fn questions_handler(
+fn questions_handler<'a>(
     event: APIGatewayEvent,
     c: Context,
-) -> Result<APIGatewayResponse, HandlerError> {
+) -> Result<APIGatewayResponse, APIError> {
     let page = event.get_query::<i64>("page").unwrap_or(1);
     let size = event.get_query::<i64>("size").unwrap_or(10);
-    let category = event
-        .get_query::<String>("category")
-        .ok_or(c.new_error("Invalid Category"))?;
+    let category = event.get_query::<String>("category").ok_or((
+        StatusCode::BAD_REQUEST,
+        APIErrorResponse {
+            message: "Invalid Category".to_owned(),
+        },
+    ))?;
 
-    let conn = connect_db_using_env_var("CONN_STRING")
-        .map_err(|e| c.new_error(&format!("Connection Error: {}", e)))?;
+    let conn = connect_db_using_env_var("CONN_STRING")?;
 
     let repository = QuestionsRepository { conn: conn };
-    let total = repository.count_questions(&category)
-        .map_err(|e| c.new_error(&format!("Error on count_questions: {}", e)))?;
-    let questions = repository
-        .get_questions(&category, page, size)
-        .map_err(|e| c.new_error(&format!("Error on get_questions: {}", e)))?;
+    let total = repository.count_questions(&category)?;
+    let questions = repository.get_questions(&category, page, size)?;
 
     let paginated_response =
         PaginatedResponse::new(questions, page as u32, total as u32, size as u32);

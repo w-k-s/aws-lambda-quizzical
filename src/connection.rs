@@ -1,5 +1,7 @@
 extern crate postgres;
 
+use apigateway::{APIError, APIErrorResponse};
+use http::StatusCode;
 use postgres::{Connection, TlsMode};
 use std::env;
 use std::fmt;
@@ -19,6 +21,17 @@ impl std::fmt::Display for ConnectionError {
             ),
             ConnectionError::ConnectionFailed(ref description) => write!(f, "{}", description),
         }
+    }
+}
+
+impl std::convert::From<ConnectionError> for APIError {
+    fn from(error: ConnectionError) -> Self {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            APIErrorResponse {
+                message: format!("{}", error),
+            },
+        )
     }
 }
 

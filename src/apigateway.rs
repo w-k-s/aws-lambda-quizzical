@@ -1,8 +1,12 @@
+use http::StatusCode;
+use lambda::{error::HandlerError, Context};
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_str, to_string, Error as JSONError};
 use std::collections::HashMap;
 use std::str::FromStr;
+
+/* #region APIGatewayEvent */
 
 #[derive(Serialize, Deserialize)]
 pub struct APIGatewayEvent {
@@ -34,6 +38,8 @@ impl APIGatewayEvent {
     }
 }
 
+/* #region APIGatewayResponse */
+
 #[derive(Serialize, Deserialize)]
 pub struct APIGatewayResponse {
     #[serde(rename = "statusCode")]
@@ -53,4 +59,27 @@ impl APIGatewayResponse {
             body: body,
         })
     }
+}
+
+/* #region Generic Lambda Handler */
+
+pub fn lambda_adapter(
+    event: APIGatewayEvent,
+    context: Context,
+    handler: &Fn(APIGatewayEvent, Context) -> Result<APIGatewayResponse, APIError>,
+) -> Result<APIGatewayResponse, HandlerError> {
+    Ok(match handler(event, context.clone()) {
+        Ok(response) => response,
+        Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
+            .map_err(|e| context.new_error(&format!("{}", e)))?,
+    })
+}
+
+/* #APIError */
+
+pub type APIError = (StatusCode, APIErrorResponse);
+
+#[derive(Serialize, Deserialize)]
+pub struct APIErrorResponse {
+    pub message: String,
 }

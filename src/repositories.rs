@@ -1,3 +1,5 @@
+use apigateway::{APIError, APIErrorResponse};
+use http::StatusCode;
 use log::{error, info};
 use models;
 use models::{Categories, Category, Choice, Question};
@@ -13,6 +15,17 @@ impl std::fmt::Display for RepositoryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let RepositoryError::DatabaseError(ref msg) = *self;
         write!(f, "{}", msg)
+    }
+}
+
+impl std::convert::From<RepositoryError> for APIError {
+    fn from(error: RepositoryError) -> Self {
+        (
+            StatusCode::BAD_REQUEST,
+            APIErrorResponse {
+                message: format!("{}", error),
+            },
+        )
     }
 }
 
@@ -47,11 +60,8 @@ pub struct QuestionsRepository {
     pub conn: Connection,
 }
 
-type TotalRecordsCount = i64;
-
 impl QuestionsRepository {
-
-    pub fn count_questions(&self,category: &str) -> Result<i64, RepositoryError> {
+    pub fn count_questions(&self, category: &str) -> Result<i64, RepositoryError> {
         let count_rows = &self
             .conn
             .query(
@@ -66,9 +76,9 @@ impl QuestionsRepository {
                 RepositoryError::DatabaseError(format!("{}", e))
             })?;
 
-        let count : i64 = match count_rows.is_empty(){
+        let count: i64 = match count_rows.is_empty() {
             true => 0i64,
-            false => count_rows.get(0).get(0)
+            false => count_rows.get(0).get(0),
         };
 
         Ok(count)
