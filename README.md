@@ -35,7 +35,9 @@ brew install filosottile/musl-cross/musl-cross
 
 For further information on cross compilation, see Useful Resources below.
 
-## 5. Test Database Script
+## 5. Testing
+
+### 5.1 Setting up test database
 
 ```
 CREATE TABLE categories(
@@ -55,7 +57,14 @@ CREATE TABLE choices(
     correct BOOL NOT NULL DEFAULT false,
     question_id BIGSERIAL NOT NULL REFERENCES questions(id) ON DELETE cascade
 );
+```
 
+### 5.2 Set
+
+To run a specific test case using the test database, execute the following command from terminal:
+
+```
+TEST_CONN_STRING='postgres://<username>:<password>@localhost:5432/quizzicaldb_test' cargo test -- --nocapture test_save_question
 ```
 
 ## 6. Useful Resources

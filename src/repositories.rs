@@ -118,8 +118,7 @@ impl QuestionsRepository {
 
         info!(
             "Insert question succeeded for question: '{:?}', with updated rows: '{:?}'.",
-            question,
-            id_rows,
+            question, id_rows,
         );
 
         let question_id: i64 = id_rows

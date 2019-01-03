@@ -14,7 +14,7 @@ extern crate serde_json;
 extern crate simple_logger;
 
 use apigateway::*;
-use connection::connect_db_using_env_var;
+use connection::connect_db_with_conn_string;
 use http::StatusCode;
 use lambda::{start, Context};
 use repositories::QuestionsRepository;
@@ -32,7 +32,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn questions_handler<'a>(
-    event: APIGatewayEvent
+    event: APIGatewayEvent,
+    config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
     let page = event.get_query::<i64>("page").unwrap_or(1);
     let size = event.get_query::<i64>("size").unwrap_or(10);
@@ -43,7 +44,7 @@ fn questions_handler<'a>(
         },
     ))?;
 
-    let conn = Arc::new(connect_db_using_env_var("CONN_STRING")?);
+    let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
     let repository = QuestionsRepository { conn: conn };
     let total = repository.count_questions(&category)?;

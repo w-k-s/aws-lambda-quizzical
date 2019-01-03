@@ -13,7 +13,7 @@ extern crate serde_json;
 extern crate simple_logger;
 
 use apigateway::*;
-use connection::connect_db_using_env_var;
+use connection::connect_db_with_conn_string;
 use lambda::{start, Context};
 use repositories::CategoriesRepository;
 use std::error::Error;
@@ -29,9 +29,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn categories_handler(
-    _event: APIGatewayEvent
+    _event: APIGatewayEvent,
+    config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
-    let conn = Arc::new(connect_db_using_env_var("CONN_STRING")?);
+    let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
     let categories = CategoriesRepository { conn: conn }.list_categories()?;
     let api_response = APIGatewayResponse::new(200, &categories).unwrap();

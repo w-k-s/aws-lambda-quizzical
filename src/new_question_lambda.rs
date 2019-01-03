@@ -14,10 +14,10 @@ extern crate serde_json;
 extern crate simple_logger;
 
 use apigateway::*;
-use connection::connect_db_using_env_var;
+use connection::connect_db_with_conn_string;
 use http::StatusCode;
-use log::{info};
 use lambda::{start, Context};
+use log::info;
 use models::{Category, Question};
 use repositories::{CategoriesRepository, QuestionsRepository};
 use std::error::Error;
@@ -34,27 +34,32 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn new_question_handler<'a>(
     event: APIGatewayEvent,
+    config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
-    let body = event.body.ok_or((
-        StatusCode::BAD_REQUEST,
-        APIErrorResponse {
-            message: "question required in body".into(),
-        },
-    ))?;
+    let question: Question = match event.parse() {
+        Ok(Some(question)) => question,
+        Ok(None) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                APIErrorResponse {
+                    message: "question required in body".into(),
+                },
+            ))
+        }
+        Err(e) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                APIErrorResponse {
+                    message: format!("{}", e),
+                },
+            ))
+        }
+    };
 
-    let question: Question = serde_json::from_str(&body).map_err(|e| {
-        (
-            StatusCode::BAD_REQUEST,
-            APIErrorResponse {
-                message: format!("{}", e),
-            },
-        )
-    })?;
-
-    let conn = Arc::new(connect_db_using_env_var("CONN_STRING")?);
+    let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
     let categories_repository = CategoriesRepository { conn: conn.clone() };
-    categories_repository.save_category(&Category {
+    let _ = categories_repository.save_category(&Category {
         title: question.category.clone(),
     });
 
@@ -70,39 +75,46 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_empty_body_returns_400(){
-        let event = APIGatewayEvent{
+    fn test_empty_body_returns_400() {
+        let event = APIGatewayEvent {
             path: "/".into(),
             query: None,
             body: None,
         };
-        
-        match new_question_handler(event){
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match new_question_handler(event, config) {
             Ok(_) => assert!(false),
-            Err((status_code, _)) => assert_eq!(status_code, StatusCode::BAD_REQUEST)
+            Err((status_code, _)) => assert_eq!(status_code, StatusCode::BAD_REQUEST),
         }
     }
 
     #[test]
-    fn test_invalid_json_returns_400(){
-
-        let event = APIGatewayEvent{
+    fn test_invalid_json_returns_400() {
+        let event = APIGatewayEvent {
             path: "/".into(),
             query: None,
             body: Some("{}".into()),
         };
-        
-        match new_question_handler(event){
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match new_question_handler(event, config) {
             Ok(_) => assert!(false),
             Err((status_code, msg)) => {
-                print!("TEST. Invalid json. Error: '{}'\n",msg);
+                print!("TEST. Invalid json. Error: '{}'\n", msg);
                 assert_eq!(status_code, StatusCode::BAD_REQUEST)
             }
         }
     }
 
     #[test]
-    fn test_save_question(){
+    fn test_save_question() {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         std::env::set_var("CONN_STRING", std::env::var("TEST_CONN_STRING").unwrap());
 
@@ -118,24 +130,34 @@ mod test {
             }]
         }"#;
 
-        let event = APIGatewayEvent{
+        let event = APIGatewayEvent {
             path: "/".into(),
             query: None,
             body: Some(question_json.into()),
         };
-        
-        match new_question_handler(event){
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match new_question_handler(event, config) {
             Ok(apiresponse) => {
                 let question: Question = serde_json::from_str(&apiresponse.body).unwrap();
                 assert_eq!(apiresponse.status_code, 201);
                 assert!(question.id.is_some());
-                assert_eq!(question.question, "Why did the chicken cross the road".to_string());
+                assert_eq!(
+                    question.question,
+                    "Why did the chicken cross the road".to_string()
+                );
                 assert_eq!(question.category, "Joke".to_string());
                 assert_eq!(question.choices.len(), 2);
-                assert_eq!(question.choices.first().unwrap().title, "To get to the other side".to_string());
+                assert_eq!(
+                    question.choices.first().unwrap().title,
+                    "To get to the other side".to_string()
+                );
                 assert!(question.choices.first().unwrap().correct);
-            },
-            Err(_) => assert!(false), 
+            }
+            Err(_) => assert!(false),
         }
     }
 }

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_str, to_string, Error as JSONError};
 use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::str::FromStr;
 
@@ -73,30 +74,44 @@ impl APIGatewayResponse {
     }
 }
 
-/* #region Generic Lambda Handler */
+/* #region Configuration */
 
-pub fn lambda_adapter_with_context(
-    event: APIGatewayEvent,
-    context: Context,
-    handler: &Fn(APIGatewayEvent, Context) -> Result<APIGatewayResponse, APIError>,
-) -> Result<APIGatewayResponse, HandlerError> {
-    info!("APIGatewayEvent: {}", event);
-
-    Ok(match handler(event, context.clone()) {
-        Ok(response) => response,
-        Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
-            .map_err(|e| context.new_error(&format!("{}", e)))?,
-    })
+/**
+ * Stores environmental variables and the context in which the lambda is running.Config
+ *
+ * Typically, a lambda function is passed an event and the lambda context.
+ * An instance of the lambda context can not be created, which makes it difficult to write unit tests.
+ * The `Config` struct is meant to act as a replacement for `Context` so that unit tests can be written.
+ *
+ * The second benefit is that it makes it easier to provide environmental variables to the unit tests.
+ * In other words, using std::env::set_var() in unit tests is avodided.
+ */
+pub struct Config {
+    pub connection_string: String,
 }
+
+impl Config {
+    fn with_context(_context: &Context) -> Config {
+        let conn_string = env::var("CONN_STRING").expect("CONN_STRING required");
+
+        Config {
+            connection_string: conn_string,
+        }
+    }
+}
+
+/* #region Generic Lambda Handler */
 
 pub fn lambda_adapter(
     event: APIGatewayEvent,
     context: Context,
-    handler: &Fn(APIGatewayEvent) -> Result<APIGatewayResponse, APIError>,
+    handler: &Fn(APIGatewayEvent, Config) -> Result<APIGatewayResponse, APIError>,
 ) -> Result<APIGatewayResponse, HandlerError> {
     info!("APIGatewayEvent: {}", event);
 
-    Ok(match handler(event) {
+    let config = Config::with_context(&context);
+
+    Ok(match handler(event, config) {
         Ok(response) => response,
         Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
             .map_err(|e| context.new_error(&format!("{}", e)))?,
@@ -112,7 +127,7 @@ pub struct APIErrorResponse {
     pub message: String,
 }
 
-impl std::fmt::Display for APIErrorResponse{
+impl std::fmt::Display for APIErrorResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "APIErrorResponse{{error: '{}'}}", self.message)
     }
