@@ -35,7 +35,30 @@ brew install filosottile/musl-cross/musl-cross
 
 For further information on cross compilation, see Useful Resources below.
 
-## 5. Useful Resources
+## 5. Test Database Script
+
+```
+CREATE TABLE categories(
+    name VARCHAR(256) PRIMARY KEY,
+    active BOOL NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE questions(
+    id BIGSERIAL PRIMARY KEY,
+    text TEXT NOT NULL,
+    category VARCHAR(256) NOT NULL REFERENCES categories(name) ON DELETE cascade
+);
+
+CREATE TABLE choices(
+    id BIGSERIAL PRIMARY KEY,
+    text TEXT NOT NULL,
+    correct BOOL NOT NULL DEFAULT false,
+    question_id BIGSERIAL NOT NULL REFERENCES questions(id) ON DELETE cascade
+);
+
+```
+
+## 6. Useful Resources
 
 1. [Cross-Compilation 1](https://chr4.org/blog/2017/03/15/cross-compile-and-link-a-static-binary-on-macos-for-linux-with-cargo-and-rust/)
 

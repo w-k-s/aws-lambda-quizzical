@@ -17,6 +17,7 @@ use connection::connect_db_using_env_var;
 use lambda::{start, Context};
 use repositories::CategoriesRepository;
 use std::error::Error;
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
@@ -28,11 +29,12 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn categories_handler(
-    _event: APIGatewayEvent,
-    _c: Context,
+    _event: APIGatewayEvent
 ) -> Result<APIGatewayResponse, APIError> {
-    let conn = connect_db_using_env_var("CONN_STRING")?;
+    let conn = Arc::new(connect_db_using_env_var("CONN_STRING")?);
+
     let categories = CategoriesRepository { conn: conn }.list_categories()?;
     let api_response = APIGatewayResponse::new(200, &categories).unwrap();
+
     Ok(api_response)
 }

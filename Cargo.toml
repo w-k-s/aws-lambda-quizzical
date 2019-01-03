@@ -20,3 +20,7 @@ path = "src/categories_lambda.rs"
 [[bin]]
 name = "questions"
 path = "src/questions_lambda.rs"
+
+[[bin]]
+name = "new_question"
+path = "src/new_question_lambda.rs"

@@ -20,6 +20,7 @@ use lambda::{start, Context};
 use repositories::QuestionsRepository;
 use responses::PaginatedResponse;
 use std::error::Error;
+use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
@@ -31,8 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn questions_handler<'a>(
-    event: APIGatewayEvent,
-    c: Context,
+    event: APIGatewayEvent
 ) -> Result<APIGatewayResponse, APIError> {
     let page = event.get_query::<i64>("page").unwrap_or(1);
     let size = event.get_query::<i64>("size").unwrap_or(10);
@@ -43,11 +43,14 @@ fn questions_handler<'a>(
         },
     ))?;
 
-    let conn = connect_db_using_env_var("CONN_STRING")?;
+    let conn = Arc::new(connect_db_using_env_var("CONN_STRING")?);
 
     let repository = QuestionsRepository { conn: conn };
     let total = repository.count_questions(&category)?;
-    let questions = repository.get_questions(&category, page, size)?;
+    let questions = match total {
+        0 => vec![],
+        _ => repository.get_questions(&category, page, size)?,
+    };
 
     let paginated_response =
         PaginatedResponse::new(questions, page as u32, total as u32, size as u32);

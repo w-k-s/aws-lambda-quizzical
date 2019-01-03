@@ -1,14 +1,16 @@
 use http::StatusCode;
 use lambda::{error::HandlerError, Context};
+use log::info;
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_str, to_string, Error as JSONError};
 use std::collections::HashMap;
+use std::fmt;
 use std::str::FromStr;
 
 /* #region APIGatewayEvent */
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct APIGatewayEvent {
     pub path: String,
     #[serde(rename = "queryStringParameters")]
@@ -38,6 +40,16 @@ impl APIGatewayEvent {
     }
 }
 
+impl std::fmt::Display for APIGatewayEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "APIGatewayEvent{{path: '{}', query: '{:?}',body: '{:?}'}}",
+            self.path, self.query, self.body
+        )
+    }
+}
+
 /* #region APIGatewayResponse */
 
 #[derive(Serialize, Deserialize)]
@@ -63,12 +75,28 @@ impl APIGatewayResponse {
 
 /* #region Generic Lambda Handler */
 
-pub fn lambda_adapter(
+pub fn lambda_adapter_with_context(
     event: APIGatewayEvent,
     context: Context,
     handler: &Fn(APIGatewayEvent, Context) -> Result<APIGatewayResponse, APIError>,
 ) -> Result<APIGatewayResponse, HandlerError> {
+    info!("APIGatewayEvent: {}", event);
+
     Ok(match handler(event, context.clone()) {
+        Ok(response) => response,
+        Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
+            .map_err(|e| context.new_error(&format!("{}", e)))?,
+    })
+}
+
+pub fn lambda_adapter(
+    event: APIGatewayEvent,
+    context: Context,
+    handler: &Fn(APIGatewayEvent) -> Result<APIGatewayResponse, APIError>,
+) -> Result<APIGatewayResponse, HandlerError> {
+    info!("APIGatewayEvent: {}", event);
+
+    Ok(match handler(event) {
         Ok(response) => response,
         Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
             .map_err(|e| context.new_error(&format!("{}", e)))?,
@@ -82,4 +110,10 @@ pub type APIError = (StatusCode, APIErrorResponse);
 #[derive(Serialize, Deserialize)]
 pub struct APIErrorResponse {
     pub message: String,
+}
+
+impl std::fmt::Display for APIErrorResponse{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "APIErrorResponse{{error: '{}'}}", self.message)
+    }
 }

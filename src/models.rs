@@ -16,14 +16,14 @@ pub struct Categories {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Choice {
-    pub id: i64,
+    pub id: Option<i64>,
     pub title: String,
     pub correct: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Question {
-    pub id: i64,
+    pub id: Option<i64>,
     pub question: String,
     pub category: String,
     pub choices: Vec<Choice>,
