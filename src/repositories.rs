@@ -8,10 +8,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+#[derive(Debug)]
 pub enum RepositoryError {
     DatabaseError(String),
 }
 
+#[derive(Debug)]
 pub enum SaveCategoryStatus {
     Created,
     Exists,

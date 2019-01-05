@@ -3,9 +3,9 @@ extern crate postgres;
 use apigateway::{APIError, APIErrorResponse};
 use http::StatusCode;
 use postgres::{Connection, TlsMode};
-use std::env;
 use std::fmt;
 
+#[derive(Debug)]
 pub enum ConnectionError {
     ConnectionFailed(String),
 }

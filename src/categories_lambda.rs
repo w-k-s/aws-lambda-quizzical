@@ -39,3 +39,50 @@ fn categories_handler(
 
     Ok(api_response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use models::{Categories, Category};
+    use std::time::SystemTime;
+
+    #[test]
+    fn test_categories_returns_200_with_list() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: None,
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        let title = format!("{:?}", SystemTime::now());
+        let conn = Arc::new(connect_db_with_conn_string(&config.connection_string).unwrap());
+        let _ = conn.execute(
+            "INSERT INTO categories (name,active) VALUES($1,$2)",
+            &[&title, &true],
+        );
+
+        match categories_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let categories: Categories = resp.parse().unwrap();
+                assert!(categories.categories.len() >= 1);
+
+                assert_eq!(
+                    1,
+                    categories
+                        .categories
+                        .iter()
+                        .filter(|c| c.title == title)
+                        .count()
+                );
+            }
+        }
+    }
+}

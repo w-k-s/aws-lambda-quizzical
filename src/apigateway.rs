@@ -11,6 +11,10 @@ use std::str::FromStr;
 
 /* #region APIGatewayEvent */
 
+/**
+ * API Gateway Event takes advantage of AWS Lambda proxy integration.
+ * All parameters are passed in an event structure. 
+ */ 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct APIGatewayEvent {
     pub path: String,
@@ -71,6 +75,13 @@ impl APIGatewayResponse {
             headers: headers,
             body: body,
         })
+    }
+
+    pub fn parse<'a, T>(&'a self) -> Result<T, JSONError>
+    where
+        T: Deserialize<'a>,
+    {
+        from_str(&self.body)
     }
 }
 

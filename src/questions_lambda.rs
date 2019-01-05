@@ -22,6 +22,9 @@ use responses::PaginatedResponse;
 use std::error::Error;
 use std::sync::Arc;
 
+const DEFAULT_PAGE: i64 = 1;
+const DEFAULT_SIZE: i64 = 10;
+
 fn main() -> Result<(), Box<dyn Error>> {
     simple_logger::init_with_level(log::Level::Debug).unwrap();
     start(
@@ -35,8 +38,8 @@ fn questions_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
-    let page = event.get_query::<i64>("page").unwrap_or(1);
-    let size = event.get_query::<i64>("size").unwrap_or(10);
+    let page = event.get_query::<i64>("page").unwrap_or(DEFAULT_PAGE);
+    let size = event.get_query::<i64>("size").unwrap_or(DEFAULT_SIZE);
     let category = event.get_query::<String>("category").ok_or((
         StatusCode::BAD_REQUEST,
         APIErrorResponse {
@@ -58,4 +61,60 @@ fn questions_handler<'a>(
 
     let api_response = APIGatewayResponse::new(200, &paginated_response).unwrap();
     Ok(api_response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use models::Question;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_empty_query_returns_400() {
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: None,
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match questions_handler(event, config) {
+            Ok(_) => assert!(false),
+            Err((status_code, _)) => {
+                assert_eq!(status_code, 400);
+            }
+        }
+    }
+
+    #[test]
+    fn test_empty_page_and_size_uses_defaults() {
+        simple_logger::init_with_level(log::Level::Debug).unwrap();
+
+        let mut query = HashMap::<String, String>::new();
+        query.insert("category".into(), "Joke".into());
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: Some(query),
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match questions_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
+                assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
+                assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+            }
+        }
+    }
 }
