@@ -13,8 +13,8 @@ use std::str::FromStr;
 
 /**
  * API Gateway Event takes advantage of AWS Lambda proxy integration.
- * All parameters are passed in an event structure. 
- */ 
+ * All parameters are passed in an event structure.
+ */
 #[derive(Debug, Serialize, Deserialize)]
 pub struct APIGatewayEvent {
     pub path: String,
@@ -118,6 +118,7 @@ pub fn lambda_adapter(
     context: Context,
     handler: &Fn(APIGatewayEvent, Config) -> Result<APIGatewayResponse, APIError>,
 ) -> Result<APIGatewayResponse, HandlerError> {
+    simple_logger::init_with_level(log::Level::Debug).unwrap();
     info!("APIGatewayEvent: {}", event);
 
     let config = Config::with_context(&context);

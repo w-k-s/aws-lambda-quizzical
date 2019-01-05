@@ -91,8 +91,6 @@ mod tests {
 
     #[test]
     fn test_empty_page_and_size_uses_defaults() {
-        simple_logger::init_with_level(log::Level::Debug).unwrap();
-
         let mut query = HashMap::<String, String>::new();
         query.insert("category".into(), "Joke".into());
 
@@ -114,6 +112,76 @@ mod tests {
                 let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
                 assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
                 assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+            }
+        }
+    }
+
+    fn populate_db() {
+        let question_json = r#"{
+            "question": "Why did the chicken cross the road",
+            "category": "Joke",
+            "choices":[{
+                "title":"To get to the other side",
+                "correct":true
+            },{
+                "title":"To commit suicide",
+                "correct":false
+            }]
+        }"#;
+
+        let question: Question = serde_json::from_str(&question_json).unwrap();
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        let conn = Arc::new(connect_db_with_conn_string(&config.connection_string).unwrap());
+
+        let repository = QuestionsRepository { conn: conn };
+
+        let _ = repository.save_question(&question).unwrap();
+    }
+
+    #[test]
+    fn test_load_questions_retuns_paginated_list() {
+        populate_db();
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        let mut query = HashMap::<String, String>::new();
+        query.insert("category".into(), "Joke".into());
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: Some(query),
+            body: None,
+        };
+
+        match questions_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
+                assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
+                assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+
+                let questions = paginated_response.data;
+                let first_question = questions.first().unwrap();
+                let first_choice = first_question.choices.first().unwrap();
+
+                assert!(questions.len() >= 1);
+
+                assert_eq!(
+                    first_question.question,
+                    "Why did the chicken cross the road".to_string()
+                );
+                assert_eq!(first_question.category, "Joke".to_string());
+                assert_eq!(first_question.choices.len(), 2);
+                assert_eq!(first_choice.title, "To get to the other side".to_string());
+                assert!(first_choice.correct);
             }
         }
     }
