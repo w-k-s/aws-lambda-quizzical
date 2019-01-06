@@ -14,7 +14,16 @@ pub struct PaginatedResponse<T> {
 }
 
 impl<T> PaginatedResponse<T> {
-    pub fn new(data: Vec<T>, page: u32, total_records: u32, limit: u32) -> PaginatedResponse<T> {
+    pub fn new(
+        data: Vec<T>,
+        page: u32,
+        total_records: u32,
+        mut limit: u32,
+    ) -> PaginatedResponse<T> {
+        if limit <= 0 {
+            limit = 1;
+        }
+
         let size = data.len() as u32;
         let page_count = (total_records / limit) + 1u32;
         let last = page >= page_count;

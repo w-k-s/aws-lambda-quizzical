@@ -118,7 +118,6 @@ pub fn lambda_adapter(
     context: Context,
     handler: &Fn(APIGatewayEvent, Config) -> Result<APIGatewayResponse, APIError>,
 ) -> Result<APIGatewayResponse, HandlerError> {
-    simple_logger::init_with_level(log::Level::Debug).unwrap();
     info!("APIGatewayEvent: {}", event);
 
     let config = Config::with_context(&context);

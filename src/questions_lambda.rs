@@ -38,8 +38,14 @@ fn questions_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
-    let page = event.get_query::<i64>("page").unwrap_or(DEFAULT_PAGE);
-    let size = event.get_query::<i64>("size").unwrap_or(DEFAULT_SIZE);
+    let page = match event.get_query::<i64>("page") {
+        Some(x) if x >= DEFAULT_PAGE => x,
+        _ => DEFAULT_PAGE,
+    };
+    let size = match event.get_query::<i64>("size") {
+        Some(x) if x >= DEFAULT_SIZE => x,
+        _ => DEFAULT_SIZE,
+    };
     let category = event.get_query::<String>("category").ok_or((
         StatusCode::BAD_REQUEST,
         APIErrorResponse {
@@ -66,9 +72,9 @@ fn questions_handler<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use models::Question;
+    use models::{Category, Question};
+    use repositories::CategoriesRepository;
     use std::collections::HashMap;
-
     #[test]
     fn test_empty_query_returns_400() {
         let event = APIGatewayEvent {
@@ -116,6 +122,93 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_zero_values_uses_defaults() {
+        let mut query = HashMap::<String, String>::new();
+        query.insert("category".into(), "Joke".into());
+        query.insert("page".into(), "0".into());
+        query.insert("size".into(), "0".into());
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: Some(query),
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match questions_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
+                assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
+                assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+            }
+        }
+    }
+
+    #[test]
+    fn test_negative_values_uses_defaults() {
+        let mut query = HashMap::<String, String>::new();
+        query.insert("category".into(), "Joke".into());
+        query.insert("page".into(), "0".into());
+        query.insert("size".into(), "0".into());
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: Some(query),
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match questions_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
+                assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
+                assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+            }
+        }
+    }
+
+    #[test]
+    fn test_alphabetic_data_uses_defaults() {
+        let mut query = HashMap::<String, String>::new();
+        query.insert("category".into(), "Joke".into());
+        query.insert("page".into(), "PAGE".into());
+        query.insert("size".into(), "SIZE".into());
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: Some(query),
+            body: None,
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match questions_handler(event, config) {
+            Err(_) => assert!(false),
+            Ok(resp) => {
+                assert_eq!(resp.status_code, 200);
+
+                let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
+                assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
+                assert!(paginated_response.size <= DEFAULT_SIZE as u32);
+            }
+        }
+    }
+
     fn populate_db() {
         let question_json = r#"{
             "question": "Why did the chicken cross the road",
@@ -137,9 +230,16 @@ mod tests {
 
         let conn = Arc::new(connect_db_with_conn_string(&config.connection_string).unwrap());
 
-        let repository = QuestionsRepository { conn: conn };
+        let categories_repository = CategoriesRepository { conn: conn.clone() };
+        let _ = categories_repository.save_category_and_set_active(
+            &Category {
+                title: question.category.clone(),
+            },
+            Some(true),
+        );
 
-        let _ = repository.save_question(&question).unwrap();
+        let questions_repository = QuestionsRepository { conn: conn.clone() };
+        let _ = questions_repository.save_question(&question).unwrap();
     }
 
     #[test]

@@ -1,3 +1,6 @@
+include .env
+export $(shell sed 's/=.*//' .env)
+
 format:
 	cargo fmt
 
@@ -19,3 +22,6 @@ build-new-questions:
 	$(call build,new_question)
 
 build: format build-categories build-questions build-new-questions
+
+test:
+	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test 

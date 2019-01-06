@@ -44,8 +44,6 @@ impl std::convert::From<RepositoryError> for APIError {
 }
 
 pub struct CategoriesRepository {
-    //moving the connection into repo because each lambda invokation will trigger a new instance.
-    //TODO: setup a singleton connection pool
     pub conn: Arc<Connection>,
 }
 
@@ -54,12 +52,37 @@ impl CategoriesRepository {
         &self,
         category: &Category,
     ) -> Result<SaveCategoryStatus, RepositoryError> {
+        self.save_category_and_set_active(category, None)
+    }
+
+    pub fn save_category_and_set_active(
+        &self,
+        category: &Category,
+        active: Option<bool>,
+    ) -> Result<SaveCategoryStatus, RepositoryError> {
         info!("save_category(category: '{:?}').", category);
 
-        let affected_rows = &self.conn.execute(
-            "INSERT INTO categories (name) VALUES ($1) ON CONFLICT DO NOTHING",
-            &[&category.title],
-        )?;
+        let (field_names, value_placeholders, on_conflict, values) = match active {
+            Some(x) => (
+                "(name,active)",
+                "($1,$2)",
+                "ON CONFLICT(name) DO UPDATE SET active=$2",
+                vec![&category.title as &ToSql, &active as &ToSql],
+            ),
+            None => (
+                "(name)",
+                "($1)",
+                "ON CONFLICT DO NOTHING",
+                vec![&category.title as &ToSql],
+            ),
+        };
+
+        let query_string = &format!(
+            "INSERT INTO categories {} VALUES {} {};",
+            field_names, value_placeholders, on_conflict
+        );
+
+        let affected_rows = &self.conn.execute(query_string, values.as_slice())?;
 
         info!(
             "Inserting category suceeded with affected rows '{:?}'.",
@@ -90,8 +113,6 @@ impl CategoriesRepository {
 }
 
 pub struct QuestionsRepository {
-    //moving the connection into repo because each lambda invokation will trigger a new instance.
-    //TODO: setup a singleton connection pool
     pub conn: Arc<Connection>,
 }
 
@@ -204,7 +225,7 @@ impl QuestionsRepository {
         let count_rows = &self
             .conn
             .query(
-                "SELECT COUNT(id) FROM questions WHERE category = $1",
+                "SELECT COUNT(q.id) FROM questions q INNER JOIN categories c ON c.name = q.category WHERE c.name = $1 AND c.active = TRUE",
                 &[&category],
             )
             .map_err(|e| {
@@ -237,7 +258,7 @@ impl QuestionsRepository {
         let question_rows = &self
             .conn
             .query(
-                "SELECT id,text FROM questions WHERE category = $1 LIMIT $2 OFFSET $3",
+                "SELECT q.id,q.text FROM questions q INNER JOIN categories c ON c.name = q.category WHERE c.name = $1 AND c.active = TRUE LIMIT $2 OFFSET $3",
                 &[&category, &size, &offset],
             )
             .map_err(|e| {
