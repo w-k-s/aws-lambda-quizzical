@@ -142,7 +142,9 @@ mod test {
 
         match new_question_handler(event, config) {
             Ok(apiresponse) => {
-                let question: Question = serde_json::from_str(&apiresponse.body).unwrap();
+                let question: Question = apiresponse.parse().unwrap();
+                let choice = question.choices.first().unwrap();
+
                 assert_eq!(apiresponse.status_code, 201);
                 assert!(question.id.is_some());
                 assert_eq!(
@@ -151,11 +153,9 @@ mod test {
                 );
                 assert_eq!(question.category, "Joke".to_string());
                 assert_eq!(question.choices.len(), 2);
-                assert_eq!(
-                    question.choices.first().unwrap().title,
-                    "To get to the other side".to_string()
-                );
-                assert!(question.choices.first().unwrap().correct);
+                assert!(choice.id.is_some());
+                assert_eq!(choice.title, "To get to the other side".to_string());
+                assert!(choice.correct);
             }
             Err(_) => assert!(false),
         }

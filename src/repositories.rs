@@ -2,6 +2,7 @@ use apigateway::{APIError, APIErrorResponse};
 use http::StatusCode;
 use log::{error, info};
 use models::{Categories, Category, Choice, Question};
+use postgres::rows::Rows;
 use postgres::types::ToSql;
 use postgres::Connection;
 use std::collections::HashMap;
@@ -176,7 +177,7 @@ impl QuestionsRepository {
         let joined_value_placeholders = value_placeholders.join(",");
 
         let query_string = &format!(
-            "INSERT INTO choices (question_id, text, correct) VALUES {}",
+            "INSERT INTO choices (question_id, text, correct) VALUES {} RETURNING id",
             joined_value_placeholders
         );
 
@@ -192,7 +193,7 @@ impl QuestionsRepository {
             question_id, query_string, values
         );
 
-        trans.query(query_string, values.as_slice()).or_else(|e| {
+        let rows: Rows = trans.query(query_string, values.as_slice()).or_else(|e| {
             error!(
                 "Bulk insert choices failed for question_id: '{}', reason: {}.",
                 question_id, e
@@ -201,6 +202,23 @@ impl QuestionsRepository {
             trans.set_rollback();
             Err(e)
         })?;;
+
+        // Create a new vector of choices, with the id field set.
+        let ids: Vec<i64> = rows.iter().map(|row| row.get(0)).collect();
+        let choices_with_ids = question
+            .choices
+            .iter()
+            .zip(ids.iter())
+            .map(|choice_id_tuple| {
+                let choice = choice_id_tuple.0;
+                let id = choice_id_tuple.1;
+                Choice {
+                    id: Some(*id),
+                    title: choice.title.clone(),
+                    correct: choice.correct,
+                }
+            })
+            .collect();
 
         trans.set_commit();
 
@@ -217,7 +235,7 @@ impl QuestionsRepository {
                 id: Some(question_id),
                 question: question.question.clone(),
                 category: question.category.clone(),
-                choices: question.choices.clone(),
+                choices: choices_with_ids,
             }))
     }
 
