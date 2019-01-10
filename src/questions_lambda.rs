@@ -50,6 +50,7 @@ fn questions_handler<'a>(
         StatusCode::BAD_REQUEST,
         APIErrorResponse {
             message: "Invalid Category".to_owned(),
+            fields: None,
         },
     ))?;
 
