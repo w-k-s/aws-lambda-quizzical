@@ -1,5 +1,3 @@
-use apigateway::{APIError, APIErrorResponse};
-use http::StatusCode;
 use log::{error, info};
 use models::{Categories, Category, Choice, Question};
 use postgres::rows::Rows;
@@ -30,17 +28,6 @@ impl std::fmt::Display for RepositoryError {
 impl std::convert::From<postgres::Error> for RepositoryError {
     fn from(error: postgres::Error) -> Self {
         return RepositoryError::DatabaseError(format!("{}", error));
-    }
-}
-
-impl std::convert::From<RepositoryError> for APIError {
-    fn from(error: RepositoryError) -> Self {
-        (
-            StatusCode::BAD_REQUEST,
-            APIErrorResponse {
-                message: format!("{}", error),
-            },
-        )
     }
 }
 

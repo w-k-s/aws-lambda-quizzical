@@ -24,6 +24,7 @@ impl std::convert::From<ConnectionError> for APIError {
             StatusCode::INTERNAL_SERVER_ERROR,
             APIErrorResponse {
                 message: format!("{}", error),
+                fields: None,
             },
         )
     }

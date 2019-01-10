@@ -36,24 +36,18 @@ fn new_question_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
 ) -> Result<APIGatewayResponse, APIError> {
-    let question: Question = match event.parse() {
+    let question: Question = match event.parse_with_validator(&Question::validate) {
         Ok(Some(question)) => question,
         Ok(None) => {
             return Err((
                 StatusCode::BAD_REQUEST,
                 APIErrorResponse {
                     message: "question required in body".into(),
+                    fields: None,
                 },
             ))
         }
-        Err(e) => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                APIErrorResponse {
-                    message: format!("{}", e),
-                },
-            ))
-        }
+        Err(e) => return Err(e),
     };
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
@@ -158,6 +152,41 @@ mod test {
                 assert!(choice.correct);
             }
             Err(_) => assert!(false),
+        }
+    }
+
+    #[test]
+    fn test_question_with_multiple_correct_options_returns_400() {
+        std::env::set_var("CONN_STRING", std::env::var("TEST_CONN_STRING").unwrap());
+
+        let question_json = r#"{
+            "question": "Why did the chicken cross the road",
+            "category": "Joke",
+            "choices":[{
+                "title":"To get to the other side",
+                "correct":true
+            },{
+                "title":"To commit suicide",
+                "correct":true
+            }]
+        }"#;
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: None,
+            body: Some(question_json.into()),
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match new_question_handler(event, config) {
+            Ok(_) => assert!(false),
+            Err((status_code, msg)) => {
+                print!("TEST. Invalid json. Error: '{}'\n", msg);
+                assert_eq!(status_code, StatusCode::BAD_REQUEST)
+            }
         }
     }
 }
