@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn questions_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
-) -> Result<APIGatewayResponse, APIError> {
+) -> Result<APIGatewayResponse, APIErrorResponse> {
     let page = match event.get_query::<i64>("page") {
         Some(x) if x >= DEFAULT_PAGE => x,
         _ => DEFAULT_PAGE,
@@ -46,12 +46,12 @@ fn questions_handler<'a>(
         Some(x) if x >= DEFAULT_SIZE => x,
         _ => DEFAULT_SIZE,
     };
-    let category = event.get_query::<String>("category").ok_or((
-        StatusCode::BAD_REQUEST,
-        APIErrorResponse {
-            message: "Invalid Category".to_owned(),
-        },
-    ))?;
+    let category = event
+        .get_query::<String>("category")
+        .ok_or(APIErrorResponse::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid Category".into(),
+        ))?;
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
@@ -65,7 +65,7 @@ fn questions_handler<'a>(
     let paginated_response =
         PaginatedResponse::new(questions, page as u32, total as u32, size as u32);
 
-    let api_response = APIGatewayResponse::new(200, &paginated_response).unwrap();
+    let api_response = APIGatewayResponse::new(StatusCode::OK, Some(&paginated_response)).unwrap();
     Ok(api_response)
 }
 
@@ -89,8 +89,8 @@ mod tests {
 
         match questions_handler(event, config) {
             Ok(_) => assert!(false),
-            Err((status_code, _)) => {
-                assert_eq!(status_code, 400);
+            Err(err) => {
+                assert_eq!(err.status_code(), StatusCode::BAD_REQUEST);
             }
         }
     }
@@ -113,7 +113,7 @@ mod tests {
         match questions_handler(event, config) {
             Err(_) => assert!(false),
             Ok(resp) => {
-                assert_eq!(resp.status_code, 200);
+                assert_eq!(resp.status_code, StatusCode::OK);
 
                 let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
                 assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);
@@ -142,7 +142,7 @@ mod tests {
         match questions_handler(event, config) {
             Err(_) => assert!(false),
             Ok(resp) => {
-                assert_eq!(resp.status_code, 200);
+                assert_eq!(resp.status_code(), 200);
 
                 let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
                 assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);

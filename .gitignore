@@ -3,3 +3,4 @@
 **/*.rs.bk
 *.zip
 node_modules
+authorizer.py

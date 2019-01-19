@@ -24,3 +24,7 @@ path = "src/questions_lambda.rs"
 [[bin]]
 name = "new_question"
 path = "src/new_question_lambda.rs"
+
+[[bin]]
+name = "update_category_active"
+path = "src/update_category_active_lambda.rs"

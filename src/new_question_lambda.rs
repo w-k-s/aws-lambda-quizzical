@@ -35,23 +35,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn new_question_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
-) -> Result<APIGatewayResponse, APIError> {
+) -> Result<APIGatewayResponse, APIErrorResponse> {
     let question: Question = match event.parse() {
         Ok(Some(question)) => question,
         Ok(None) => {
-            return Err((
+            return Err(APIErrorResponse::new(
                 StatusCode::BAD_REQUEST,
-                APIErrorResponse {
-                    message: "question required in body".into(),
-                },
+                "question required in body".into(),
             ))
         }
         Err(e) => {
-            return Err((
+            return Err(APIErrorResponse::new(
                 StatusCode::BAD_REQUEST,
-                APIErrorResponse {
-                    message: format!("{}", e),
-                },
+                format!("{}", e),
             ))
         }
     };
@@ -66,7 +62,7 @@ fn new_question_handler<'a>(
     let question_repository = QuestionsRepository { conn: conn.clone() };
     let new_question = question_repository.save_question(&question)?;
 
-    let api_response = APIGatewayResponse::new(201, &new_question).unwrap();
+    let api_response = APIGatewayResponse::new(StatusCode::CREATED, Some(&new_question)).unwrap();
     Ok(api_response)
 }
 
@@ -88,7 +84,7 @@ mod test {
 
         match new_question_handler(event, config) {
             Ok(_) => assert!(false),
-            Err((status_code, _)) => assert_eq!(status_code, StatusCode::BAD_REQUEST),
+            Err(err) => assert_eq!(err.status_code(), StatusCode::BAD_REQUEST),
         }
     }
 
@@ -106,9 +102,9 @@ mod test {
 
         match new_question_handler(event, config) {
             Ok(_) => assert!(false),
-            Err((status_code, msg)) => {
-                print!("TEST. Invalid json. Error: '{}'\n", msg);
-                assert_eq!(status_code, StatusCode::BAD_REQUEST)
+            Err(err) => {
+                print!("TEST. Invalid json. Error: '{}'\n", err.message());
+                assert_eq!(err.status_code(), StatusCode::BAD_REQUEST)
             }
         }
     }
@@ -145,7 +141,7 @@ mod test {
                 let question: Question = apiresponse.parse().unwrap();
                 let choice = question.choices.first().unwrap();
 
-                assert_eq!(apiresponse.status_code, 201);
+                assert_eq!(apiresponse.status_code, StatusCode::CREATED);
                 assert!(question.id.is_some());
                 assert_eq!(
                     question.question,

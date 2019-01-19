@@ -14,6 +14,7 @@ extern crate simple_logger;
 
 use apigateway::*;
 use connection::connect_db_with_conn_string;
+use http::StatusCode;
 use lambda::{start, Context};
 use repositories::CategoriesRepository;
 use std::error::Error;
@@ -31,11 +32,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn categories_handler(
     _event: APIGatewayEvent,
     config: Config,
-) -> Result<APIGatewayResponse, APIError> {
+) -> Result<APIGatewayResponse, APIErrorResponse> {
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
     let categories = CategoriesRepository { conn: conn }.list_categories()?;
-    let api_response = APIGatewayResponse::new(200, &categories).unwrap();
+    let api_response = APIGatewayResponse::new(StatusCode::OK, Some(&categories)).unwrap();
 
     Ok(api_response)
 }
@@ -69,7 +70,7 @@ mod tests {
         match categories_handler(event, config) {
             Err(_) => assert!(false),
             Ok(resp) => {
-                assert_eq!(resp.status_code, 200);
+                assert_eq!(resp.status_code(), StatusCode::OK);
 
                 let categories: Categories = resp.parse().unwrap();
                 assert!(categories.categories.len() >= 1);
