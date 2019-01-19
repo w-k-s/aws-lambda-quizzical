@@ -22,6 +22,8 @@ pub struct APIGatewayEvent {
     pub path: String,
     #[serde(rename = "queryStringParameters")]
     pub query: Option<HashMap<String, String>>,
+    #[serde(rename = "pathParameters")]
+    pub path_parameters: Option<HashMap<String, String>>,
     pub body: Option<String>,
 }
 
@@ -61,6 +63,16 @@ impl APIGatewayEvent {
     {
         match self.query {
             Some(ref query) => query.get(name).and_then(|value| T::from_str(value).ok()),
+            None => None,
+        }
+    }
+
+    pub fn get_path_param<T>(&self, name: &str) -> Option<T>
+    where
+        T: FromStr,
+    {
+        match self.path_parameters {
+            Some(ref params) => params.get(name).and_then(|value| T::from_str(value).ok()),
             None => None,
         }
     }

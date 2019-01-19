@@ -81,6 +81,7 @@ mod tests {
             path: "/".into(),
             query: None,
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -104,6 +105,7 @@ mod tests {
             path: "/".into(),
             query: Some(query),
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -133,6 +135,7 @@ mod tests {
             path: "/".into(),
             query: Some(query),
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -162,6 +165,7 @@ mod tests {
             path: "/".into(),
             query: Some(query),
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -191,6 +195,7 @@ mod tests {
             path: "/".into(),
             query: Some(query),
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -257,6 +262,7 @@ mod tests {
             path: "/".into(),
             query: Some(query),
             body: None,
+            path_parameters: None,
         };
 
         match questions_handler(event, config) {

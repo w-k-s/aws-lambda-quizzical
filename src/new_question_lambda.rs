@@ -76,6 +76,7 @@ mod test {
             path: "/".into(),
             query: None,
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
@@ -94,6 +95,7 @@ mod test {
             path: "/".into(),
             query: None,
             body: Some("{}".into()),
+            path_parameters: None,
         };
 
         let config = Config {
@@ -130,6 +132,7 @@ mod test {
             path: "/".into(),
             query: None,
             body: Some(question_json.into()),
+            path_parameters: None,
         };
 
         let config = Config {
@@ -177,6 +180,7 @@ mod test {
             path: "/".into(),
             query: None,
             body: Some(question_json.into()),
+            path_parameters: None,
         };
 
         let config = Config {

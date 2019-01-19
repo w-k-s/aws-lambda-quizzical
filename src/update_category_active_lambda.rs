@@ -42,28 +42,28 @@ fn update_category_active_handler(
     event: APIGatewayEvent,
     config: Config,
 ) -> Result<APIGatewayResponse, APIErrorResponse> {
-    let category: String = match event.get_query("category") {
+    let category: String = match event.get_path_param("category") {
         Some(category) => category,
         None => {
             return Err(APIErrorResponse::new(
                 StatusCode::BAD_REQUEST,
-                "category required in query".into(),
+                "category required in path".into(),
             ))
         }
     };
-    let active: bool = match event.get_query("active") {
-        Some(active) => active,
-        None => {
+    let status = match event.parse::<CategoryStatus>() {
+        Ok(Some(status)) => status,
+        _ => {
             return Err(APIErrorResponse::new(
                 StatusCode::BAD_REQUEST,
-                "active boolean ('true'/'false') required in query".into(),
+                "Expected {\"active\": [true|false] }".into(),
             ))
         }
     };
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
-    let active = CategoriesRepository { conn: conn }.set_category_active(&category, active)?;
+    let active = CategoriesRepository { conn: conn }.set_category_active(&category, status.active)?;
     let api_response =
         APIGatewayResponse::new(StatusCode::OK, Some(&CategoryStatus { active: active })).unwrap();
 
@@ -82,14 +82,15 @@ mod tests {
         simple_logger::init_with_level(log::Level::Debug).unwrap();
         let title = format!("{:?}", SystemTime::now());
 
-        let mut query: HashMap<String, String> = HashMap::new();
-        query.insert("category".into(), title.clone());
-        query.insert("active".into(), "true".into());
+        let mut path_params: HashMap<String, String> = HashMap::new();
+        path_params.insert("category".into(), title.clone());
+        path_params.insert("active".into(), "true".into());
 
         let event = APIGatewayEvent {
             path: "/category/Science/activate".into(),
-            query: Some(query),
-            body: None,
+            query: None,
+            path_parameters: Some(path_params),
+            body: Some("{\"active\": true }".into()),
         };
 
         let config = Config {
