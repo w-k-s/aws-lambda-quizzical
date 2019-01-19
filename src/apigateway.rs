@@ -1,6 +1,8 @@
 use http::StatusCode;
 use lambda::{error::HandlerError, Context};
 use log::info;
+use models::ValidationError;
+use repositories::RepositoryError;
 use serde::{Deserialize, Serialize};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::{from_str, to_string, Error as JSONError};
@@ -24,12 +26,46 @@ pub struct APIGatewayEvent {
 }
 
 impl APIGatewayEvent {
-    pub fn parse<'a, T>(&'a self) -> Result<Option<T>, JSONError>
+    pub fn parse<'a, T>(&'a self) -> Result<Option<T>, APIError>
     where
         T: Deserialize<'a>,
     {
         match self.body {
-            Some(ref body) => from_str(body),
+            Some(ref body) => from_str(body).map_err(|e| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    APIErrorResponse {
+                        message: format!("{}", e),
+                        fields: None,
+                    },
+                )
+            }),
+            None => Ok(None),
+        }
+    }
+
+    pub fn parse_with_validator<'a, T>(
+        &'a self,
+        validator: &Fn(&T) -> Result<(), ValidationError>,
+    ) -> Result<Option<T>, APIError>
+    where
+        T: Deserialize<'a>,
+    {
+        match self.body {
+            Some(ref body) => from_str(body)
+                .map_err(|e| {
+                    (
+                        StatusCode::BAD_REQUEST,
+                        APIErrorResponse {
+                            message: format!("{}", e),
+                            fields: None,
+                        },
+                    )
+                })
+                .and_then(|t: T| match validator(&t) {
+                    Ok(_) => Ok(Some(t)),
+                    Err(e) => Err(e.into()),
+                }),
             None => Ok(None),
         }
     }
@@ -167,5 +203,34 @@ impl APIErrorResponse {
 impl std::fmt::Display for APIErrorResponse {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "APIErrorResponse{{error: '{}'}}", self.message)
+    }
+}
+
+impl std::convert::From<RepositoryError> for APIError {
+    fn from(error: RepositoryError) -> Self {
+        (
+            StatusCode::BAD_REQUEST,
+            APIErrorResponse {
+                message: format!("{}", error),
+                fields: None,
+            },
+        )
+    }
+}
+
+impl std::convert::From<ValidationError> for APIError {
+    fn from(error: ValidationError) -> Self {
+        let ValidationError::Constraint(field, message) = error;
+        let mut fields: HashMap<String, String> = HashMap::new();
+
+        fields.insert(field, message.clone());
+
+        (
+            StatusCode::BAD_REQUEST,
+            APIErrorResponse {
+                message: message.clone(),
+                fields: Some(fields),
+            },
+        )
     }
 }

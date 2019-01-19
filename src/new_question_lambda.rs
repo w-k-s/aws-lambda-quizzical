@@ -156,4 +156,39 @@ mod test {
             Err(_) => assert!(false),
         }
     }
+
+    #[test]
+    fn test_question_with_multiple_correct_options_returns_400() {
+        std::env::set_var("CONN_STRING", std::env::var("TEST_CONN_STRING").unwrap());
+
+        let question_json = r#"{
+            "question": "Why did the chicken cross the road",
+            "category": "Joke",
+            "choices":[{
+                "title":"To get to the other side",
+                "correct":true
+            },{
+                "title":"To commit suicide",
+                "correct":true
+            }]
+        }"#;
+
+        let event = APIGatewayEvent {
+            path: "/".into(),
+            query: None,
+            body: Some(question_json.into()),
+        };
+
+        let config = Config {
+            connection_string: std::env::var("TEST_CONN_STRING").unwrap(),
+        };
+
+        match new_question_handler(event, config) {
+            Ok(_) => assert!(false),
+            Err((status_code, msg)) => {
+                print!("TEST. Invalid json. Error: '{}'\n", msg);
+                assert_eq!(status_code, StatusCode::BAD_REQUEST)
+            }
+        }
+    }
 }
