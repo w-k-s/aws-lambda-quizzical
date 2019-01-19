@@ -36,7 +36,7 @@ fn new_question_handler<'a>(
     event: APIGatewayEvent,
     config: Config,
 ) -> Result<APIGatewayResponse, APIErrorResponse> {
-    let question: Question = match event.parse() {
+    let question: Question = match event.parse_with_validator(&Question::validate) {
         Ok(Some(question)) => question,
         Ok(None) => {
             return Err(APIErrorResponse::new(
@@ -185,9 +185,9 @@ mod test {
 
         match new_question_handler(event, config) {
             Ok(_) => assert!(false),
-            Err((status_code, msg)) => {
-                print!("TEST. Invalid json. Error: '{}'\n", msg);
-                assert_eq!(status_code, StatusCode::BAD_REQUEST)
+            Err(err) => {
+                print!("TEST. Invalid json. Error: '{}'\n", err.message());
+                assert_eq!(err.status_code(), StatusCode::BAD_REQUEST)
             }
         }
     }

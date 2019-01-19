@@ -26,20 +26,13 @@ pub struct APIGatewayEvent {
 }
 
 impl APIGatewayEvent {
-    pub fn parse<'a, T>(&'a self) -> Result<Option<T>, APIError>
+    pub fn parse<'a, T>(&'a self) -> Result<Option<T>, APIErrorResponse>
     where
         T: Deserialize<'a>,
     {
         match self.body {
-            Some(ref body) => from_str(body).map_err(|e| {
-                (
-                    StatusCode::BAD_REQUEST,
-                    APIErrorResponse {
-                        message: format!("{}", e),
-                        fields: None,
-                    },
-                )
-            }),
+            Some(ref body) => from_str(body)
+                .map_err(|e| APIErrorResponse::new(StatusCode::BAD_REQUEST, format!("{}", e))),
             None => Ok(None),
         }
     }
@@ -47,21 +40,13 @@ impl APIGatewayEvent {
     pub fn parse_with_validator<'a, T>(
         &'a self,
         validator: &Fn(&T) -> Result<(), ValidationError>,
-    ) -> Result<Option<T>, APIError>
+    ) -> Result<Option<T>, APIErrorResponse>
     where
         T: Deserialize<'a>,
     {
         match self.body {
             Some(ref body) => from_str(body)
-                .map_err(|e| {
-                    (
-                        StatusCode::BAD_REQUEST,
-                        APIErrorResponse {
-                            message: format!("{}", e),
-                            fields: None,
-                        },
-                    )
-                })
+                .map_err(|e| APIErrorResponse::new(StatusCode::BAD_REQUEST, format!("{}", e)))
                 .and_then(|t: T| match validator(&t) {
                     Ok(_) => Ok(Some(t)),
                     Err(e) => Err(e.into()),
@@ -206,31 +191,19 @@ impl std::fmt::Display for APIErrorResponse {
     }
 }
 
-impl std::convert::From<RepositoryError> for APIError {
+impl std::convert::From<RepositoryError> for APIErrorResponse {
     fn from(error: RepositoryError) -> Self {
-        (
-            StatusCode::BAD_REQUEST,
-            APIErrorResponse {
-                message: format!("{}", error),
-                fields: None,
-            },
-        )
+        APIErrorResponse::new(StatusCode::BAD_REQUEST, format!("{}", error))
     }
 }
 
-impl std::convert::From<ValidationError> for APIError {
+impl std::convert::From<ValidationError> for APIErrorResponse {
     fn from(error: ValidationError) -> Self {
         let ValidationError::Constraint(field, message) = error;
         let mut fields: HashMap<String, String> = HashMap::new();
 
         fields.insert(field, message.clone());
 
-        (
-            StatusCode::BAD_REQUEST,
-            APIErrorResponse {
-                message: message.clone(),
-                fields: Some(fields),
-            },
-        )
+        APIErrorResponse::new(StatusCode::BAD_REQUEST, message.clone())
     }
 }

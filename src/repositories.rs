@@ -33,12 +33,6 @@ impl std::convert::From<postgres::Error> for RepositoryError {
     }
 }
 
-impl std::convert::From<RepositoryError> for APIErrorResponse {
-    fn from(error: RepositoryError) -> Self {
-        APIErrorResponse::new(StatusCode::BAD_REQUEST, format!("{}", error))
-    }
-}
-
 pub struct CategoriesRepository {
     pub conn: Arc<Connection>,
 }
