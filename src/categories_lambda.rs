@@ -54,6 +54,7 @@ mod tests {
             path: "/".into(),
             query: None,
             body: None,
+            path_parameters: None,
         };
 
         let config = Config {
