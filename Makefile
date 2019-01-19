@@ -21,7 +21,13 @@ build-questions:
 build-new-questions:
 	$(call build,new_question)
 
-build: format build-categories build-questions build-new-questions
+build-update-category-active:
+	$(call build,update_category_active)
+
+build: format build-categories build-questions build-new-questions build-update-category-active
 
 test:
 	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test 
+
+test-fn:
+	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test -- $(FN_NAME)

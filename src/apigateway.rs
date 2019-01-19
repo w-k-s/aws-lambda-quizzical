@@ -96,21 +96,31 @@ impl std::fmt::Display for APIGatewayEvent {
 #[derive(Serialize, Deserialize)]
 pub struct APIGatewayResponse {
     #[serde(rename = "statusCode")]
-    pub status_code: u32,
+    pub status_code: u16,
     pub headers: HashMap<String, String>,
     pub body: String,
 }
 
 impl APIGatewayResponse {
-    pub fn new<T: Serialize>(status: u32, data: &T) -> Result<APIGatewayResponse, JSONError> {
+    pub fn new<T: Serialize>(
+        status_code: StatusCode,
+        data: Option<&T>,
+    ) -> Result<APIGatewayResponse, JSONError> {
         let mut headers = HashMap::new();
         headers.insert("Access-Control-Allow-Origin".to_owned(), "*".to_owned());
-        let body = to_string(data)?;
+        let body: String = match data {
+            Some(ref data) => to_string(data)?,
+            None => "".into(),
+        };
         Ok(APIGatewayResponse {
-            status_code: status,
+            status_code: status_code.as_u16(),
             headers: headers,
             body: body,
         })
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        StatusCode::from_u16(self.status_code).unwrap()
     }
 
     pub fn parse<'a, T>(&'a self) -> Result<T, JSONError>
@@ -152,7 +162,7 @@ impl Config {
 pub fn lambda_adapter(
     event: APIGatewayEvent,
     context: Context,
-    handler: &Fn(APIGatewayEvent, Config) -> Result<APIGatewayResponse, APIError>,
+    handler: &Fn(APIGatewayEvent, Config) -> Result<APIGatewayResponse, APIErrorResponse>,
 ) -> Result<APIGatewayResponse, HandlerError> {
     info!("APIGatewayEvent: {}", event);
 
@@ -160,19 +170,34 @@ pub fn lambda_adapter(
 
     Ok(match handler(event, config) {
         Ok(response) => response,
-        Err(error) => APIGatewayResponse::new(error.0.as_u16() as u32, &error.1)
+        Err(error) => APIGatewayResponse::new(error.status_code(), Some(&error.message()))
             .map_err(|e| context.new_error(&format!("{}", e)))?,
     })
 }
 
-/* #APIError */
+/* #APIErrorResponse */
 
-pub type APIError = (StatusCode, APIErrorResponse);
-
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct APIErrorResponse {
-    pub message: String,
-    pub fields: Option<HashMap<String, String>>,
+    status_code: u16,
+    message: String,
+}
+
+impl APIErrorResponse {
+    pub fn new(status_code: StatusCode, message: String) -> Self {
+        APIErrorResponse {
+            status_code: status_code.as_u16(),
+            message: message,
+        }
+    }
+
+    pub fn status_code(&self) -> StatusCode {
+        StatusCode::from_u16(self.status_code).unwrap()
+    }
+
+    pub fn message(&self) -> String {
+        self.message.clone()
+    }
 }
 
 impl std::fmt::Display for APIErrorResponse {

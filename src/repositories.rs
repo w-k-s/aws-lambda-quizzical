@@ -1,3 +1,5 @@
+use apigateway::APIErrorResponse;
+use http::StatusCode;
 use log::{error, info};
 use models::{Categories, Category, Choice, Question};
 use postgres::rows::Rows;
@@ -28,6 +30,12 @@ impl std::fmt::Display for RepositoryError {
 impl std::convert::From<postgres::Error> for RepositoryError {
     fn from(error: postgres::Error) -> Self {
         return RepositoryError::DatabaseError(format!("{}", error));
+    }
+}
+
+impl std::convert::From<RepositoryError> for APIErrorResponse {
+    fn from(error: RepositoryError) -> Self {
+        APIErrorResponse::new(StatusCode::BAD_REQUEST, format!("{}", error))
     }
 }
 
@@ -97,6 +105,15 @@ impl CategoriesRepository {
         Ok(Categories {
             categories: categories,
         })
+    }
+
+    pub fn set_category_active(&self, name: &str, active: bool) -> Result<bool, RepositoryError> {
+        let affected_rows = self.conn.execute(
+            "UPDATE categories SET active = $1 WHERE name = $2 AND active=$3",
+            &[&active, &name, &(!active)],
+        )?;
+
+        Ok(affected_rows > 0u64)
     }
 }
 
