@@ -10,26 +10,56 @@ use std::fmt;
 use std::sync::Arc;
 
 #[derive(Debug)]
-pub enum RepositoryError {
-    DatabaseError(String),
-}
-
-#[derive(Debug)]
 pub enum SaveCategoryStatus {
     Created,
     Exists,
 }
 
+#[derive(Debug)]
+pub enum RepositoryError {
+    ConnectionError(String),
+    DatabaseError(String, String),
+    IOError(String),
+    ConversionError(String),
+    UnknownError(Option<String>),
+}
+
 impl std::fmt::Display for RepositoryError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let RepositoryError::DatabaseError(ref msg) = *self;
-        write!(f, "{}", msg)
+        let message = match *self {
+            RepositoryError::ConnectionError(ref message) => message,
+            RepositoryError::DatabaseError(_, ref message) => message,
+            RepositoryError::IOError(ref message) => message,
+            RepositoryError::ConversionError(ref message) => message,
+            RepositoryError::UnknownError(Some(ref message)) => message,
+            RepositoryError::UnknownError(None) => "Unknown Error",
+        };
+        write!(f, "{}", message)
     }
 }
 
 impl std::convert::From<postgres::Error> for RepositoryError {
     fn from(error: postgres::Error) -> Self {
-        return RepositoryError::DatabaseError(format!("{}", error));
+        if let Some(connection_error) = error.as_connection() {
+            return RepositoryError::ConnectionError(format!("{}", connection_error));
+        }
+
+        if let Some(db_error) = error.as_db() {
+            return RepositoryError::DatabaseError(
+                db_error.code.code().into(),
+                db_error.message.clone(),
+            );
+        }
+
+        if let Some(conversion_error) = error.as_conversion() {
+            return RepositoryError::ConversionError(format!("{}", conversion_error));
+        }
+
+        if let Some(io_error) = error.as_io() {
+            return RepositoryError::IOError(format!("{}", io_error));
+        }
+
+        return RepositoryError::UnknownError(Some(format!("{}", error)));
     }
 }
 
@@ -147,9 +177,9 @@ impl QuestionsRepository {
             .iter()
             .next()
             .and_then(|row| row.get(0))
-            .ok_or(RepositoryError::DatabaseError(
+            .ok_or(RepositoryError::UnknownError(Some(
                 "Failed to get question id".into(),
-            ))
+            )))
             .map_err(|e| {
                 error!(
                     "Insert question succeeded but no id received for question: '{:?}'.",
@@ -227,7 +257,7 @@ impl QuestionsRepository {
                     "Finishing insert question failed for question_id '{}' with reason '{}'.",
                     question_id, e
                 );
-                RepositoryError::DatabaseError(format!("{}", e))
+                e.into()
             })
             .and(Ok(Question {
                 id: Some(question_id),
@@ -249,7 +279,7 @@ impl QuestionsRepository {
                     "Error counting questions for category '{}': {}",
                     category, e
                 );
-                RepositoryError::DatabaseError(format!("{}", e))
+                e
             })?;
 
         let count: i64 = match count_rows.is_empty() {
@@ -279,7 +309,7 @@ impl QuestionsRepository {
             )
             .map_err(|e| {
                 error!("Error loading questions for category '{}': {}", category, e);
-                RepositoryError::DatabaseError(format!("{}", e))
+                e
             })?;
 
         if question_rows.is_empty() {
@@ -303,7 +333,7 @@ impl QuestionsRepository {
                     "Error loading choices for questions '{:?}': {}",
                     question_ids, e
                 );
-                RepositoryError::DatabaseError(format!("{}", e))
+                e
             })?;
 
         let mut choices_map: HashMap<i64, Vec<Choice>> = HashMap::new();

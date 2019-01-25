@@ -27,7 +27,7 @@ build-update-category-active:
 build: format build-categories build-questions build-new-questions build-update-category-active
 
 test:
-	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test 
+	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test -- --nocapture
 
 test-fn:
-	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test -- $(FN_NAME)
+	@-TEST_CONN_STRING=$(TEST_CONN_STRING) cargo test  -- $(FN_NAME) --nocapture
