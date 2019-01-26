@@ -48,9 +48,9 @@ fn questions_handler<'a>(
     };
     let category = event
         .get_query::<String>("category")
-        .ok_or(APIErrorResponse::from(ValidationError {
-            id: None,
-            detail: Some("Invalid Category".into()),
+        .ok_or(APIErrorResponse::from(QueryParameterError {
+            parameter: "category".into(),
+            detail: Some("Missing 'category' parameter".into()),
         }))?;
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);

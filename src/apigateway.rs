@@ -38,7 +38,6 @@ impl APIGatewayEvent {
         match self.body {
             Some(ref body) => from_str(body).map_err(|e| {
                 APIErrorType::ParsingError {
-                    id: None,
                     detail: Some(format!("{}", e)),
                 }
                 .into()
@@ -58,18 +57,19 @@ impl APIGatewayEvent {
             Some(ref body) => from_str(body)
                 .map_err(|e| {
                     APIErrorType::ParsingError {
-                        id: None,
                         detail: Some(format!("{}", e)),
                     }
                     .into()
                 })
                 .and_then(|t: T| match validator(&t) {
                     Ok(_) => Ok(Some(t)),
-                    Err(e) => Err(APIErrorType::ValidationError {
-                        id: None,
-                        detail: Some(format!("{}", e)),
+                    Err(ValidationError::Constraint { pointer, message }) => {
+                        Err(APIErrorType::BodyParameterError {
+                            pointer: pointer,
+                            detail: Some(message),
+                        }
+                        .into())
                     }
-                    .into()),
                 }),
             None => Ok(None),
         }
@@ -206,40 +206,29 @@ pub fn lambda_adapter(
 /* #APIErrorResponse */
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct APIError {
-    id: Option<String>,
-    status: u16,
-    code: String,
-    title: String,
-    detail: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct APIErrorResponse {
     errors: Vec<APIError>,
 }
 
 impl APIErrorResponse {
     pub fn error(
-        id: Option<String>,
         status: u16,
         code: String,
         title: String,
         detail: Option<String>,
+        source: Option<APIErrorSource>,
     ) -> Self {
         return APIErrorResponse {
             errors: vec![APIError {
-                id: id,
                 status: status,
                 code: code,
                 title: title,
                 detail: detail,
+                source: source,
             }],
         };
     }
-}
 
-impl APIErrorResponse {
     pub fn status_code(&self) -> u16 {
         self.errors
             .first()
@@ -248,13 +237,35 @@ impl APIErrorResponse {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct APIError {
+    status: u16,
+    code: String,
+    title: String,
+    detail: Option<String>,
+    source: Option<APIErrorSource>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum APIErrorSource {
+    Pointer { pointer: String },
+    QueryParameter { parameter: String },
+}
+
 pub enum APIErrorType {
     ParsingError {
-        id: Option<String>,
+        detail: Option<String>,
+    },
+    QueryParameterError {
+        parameter: String,
+        detail: Option<String>,
+    },
+    BodyParameterError {
+        pointer: String,
         detail: Option<String>,
     },
     ValidationError {
-        id: Option<String>,
         detail: Option<String>,
     },
     RepositoryError {
@@ -265,19 +276,35 @@ pub enum APIErrorType {
 impl std::convert::From<APIErrorType> for APIErrorResponse {
     fn from(pattern: APIErrorType) -> Self {
         return match pattern {
-            APIErrorType::ParsingError { id, detail } => APIErrorResponse::error(
-                id,
+            APIErrorType::ParsingError { detail } => APIErrorResponse::error(
                 400,
-                "validation.request".into(),
+                "request.validation".into(),
                 "Invalid Request Parameters".into(),
                 detail,
+                None,
             ),
-            APIErrorType::ValidationError { id, detail } => APIErrorResponse::error(
-                id,
+            APIErrorType::QueryParameterError { parameter, detail } => APIErrorResponse::error(
+                400,
+                "request.validation.query".into(),
+                "Invalid Query Parameter".into(),
+                detail,
+                Some(APIErrorSource::QueryParameter {
+                    parameter: parameter,
+                }),
+            ),
+            APIErrorType::BodyParameterError { pointer, detail } => APIErrorResponse::error(
+                400,
+                "request.validation.body".into(),
+                "Invalid Request".into(),
+                detail,
+                Some(APIErrorSource::Pointer { pointer: pointer }),
+            ),
+            APIErrorType::ValidationError { detail } => APIErrorResponse::error(
                 400,
                 "validation".into(),
                 "Validation Error".into(),
                 detail,
+                None,
             ),
             APIErrorType::RepositoryError { repositoryError } => repositoryError.into(),
         };
@@ -298,6 +325,6 @@ impl std::convert::From<RepositoryError> for APIErrorResponse {
             UnknownError(message) => ("db", "Database Unknown Error", message),
         };
 
-        APIErrorResponse::error(None, 500, code.into(), title.into(), detail)
+        APIErrorResponse::error(500, code.into(), title.into(), detail, None)
     }
 }

@@ -7,13 +7,13 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum ValidationError {
-    Constraint { field: String, message: String },
+    Constraint { pointer: String, message: String },
 }
 
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let ValidationError::Constraint { field, message } = self;
-        write!(f, "ValidationError{{ {}: {} }}", field, message,)
+        let ValidationError::Constraint { pointer, message } = self;
+        write!(f, "ValidationError{{ {}: {} }}", pointer, message,)
     }
 }
 
@@ -52,7 +52,7 @@ impl Question {
             > 1
         {
             return Err(ValidationError::Constraint {
-                field: "choices".into(),
+                pointer: "/data/attribute/choices".into(),
                 message: "Only one correct choice allowed".into(),
             });
         }

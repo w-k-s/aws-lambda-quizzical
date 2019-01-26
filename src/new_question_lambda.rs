@@ -38,9 +38,9 @@ fn new_question_handler<'a>(
     let question: Question = match event.parse_with_validator(&Question::validate) {
         Ok(Some(question)) => question,
         Ok(None) => {
-            return Err(ValidationError {
-                id: None,
-                detail: Some("question required in body".into()),
+            return Err(BodyParameterError {
+                pointer: "/data".into(),
+                detail: Some("'Question' required in body".into()),
             }
             .into())
         }

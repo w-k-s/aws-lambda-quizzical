@@ -45,8 +45,8 @@ fn update_category_active_handler(
     let category: String = match event.get_path_param("category") {
         Some(category) => category,
         None => {
-            return Err(ValidationError {
-                id: None,
+            return Err(QueryParameterError {
+                parameter: "category".into(),
                 detail: Some("category required in path".into()),
             }
             .into())
@@ -55,8 +55,8 @@ fn update_category_active_handler(
     let status = match event.parse::<CategoryStatus>() {
         Ok(Some(status)) => status,
         _ => {
-            return Err(ValidationError {
-                id: None,
+            return Err(BodyParameterError {
+                pointer: "/data/attribute/active".into(),
                 detail: Some("Expected {\"active\": [true|false] }".into()),
             }
             .into())
