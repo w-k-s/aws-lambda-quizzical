@@ -13,7 +13,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate simple_logger;
 
-use apigateway::*;
+use apigateway::{APIErrorType::*, *};
 use connection::connect_db_with_conn_string;
 use http::StatusCode;
 use lambda::{start, Context};
@@ -48,10 +48,10 @@ fn questions_handler<'a>(
     };
     let category = event
         .get_query::<String>("category")
-        .ok_or(APIErrorResponse::new(
-            StatusCode::BAD_REQUEST,
-            "Invalid Category".into(),
-        ))?;
+        .ok_or(APIErrorResponse::from(QueryParameterError {
+            parameter: "category".into(),
+            detail: Some("Missing 'category' parameter".into()),
+        }))?;
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
@@ -65,7 +65,7 @@ fn questions_handler<'a>(
     let paginated_response =
         PaginatedResponse::new(questions, page as u32, total as u32, size as u32);
 
-    let api_response = APIGatewayResponse::new(StatusCode::OK, Some(&paginated_response)).unwrap();
+    let api_response = APIGatewayResponse::new(200, Some(&paginated_response)).unwrap();
     Ok(api_response)
 }
 
@@ -145,7 +145,7 @@ mod tests {
         match questions_handler(event, config) {
             Err(_) => assert!(false),
             Ok(resp) => {
-                assert_eq!(resp.status_code(), 200);
+                assert_eq!(resp.status_code, 200);
 
                 let paginated_response: PaginatedResponse<Question> = resp.parse().unwrap();
                 assert_eq!(paginated_response.page, DEFAULT_PAGE as u32);

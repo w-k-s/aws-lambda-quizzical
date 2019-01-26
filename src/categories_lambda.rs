@@ -36,7 +36,7 @@ fn categories_handler(
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
     let categories = CategoriesRepository { conn: conn }.list_categories()?;
-    let api_response = APIGatewayResponse::new(StatusCode::OK, Some(&categories)).unwrap();
+    let api_response = APIGatewayResponse::new(200, Some(&categories)).unwrap();
 
     Ok(api_response)
 }
@@ -71,7 +71,7 @@ mod tests {
         match categories_handler(event, config) {
             Err(_) => assert!(false),
             Ok(resp) => {
-                assert_eq!(resp.status_code(), StatusCode::OK);
+                assert_eq!(resp.status_code, 200);
 
                 let categories: Categories = resp.parse().unwrap();
                 assert!(categories.categories.len() >= 1);

@@ -12,7 +12,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate simple_logger;
 
-use apigateway::*;
+use apigateway::{APIErrorType::*, *};
 use connection::connect_db_with_conn_string;
 use http::StatusCode;
 use lambda::{start, Context};
@@ -45,27 +45,30 @@ fn update_category_active_handler(
     let category: String = match event.get_path_param("category") {
         Some(category) => category,
         None => {
-            return Err(APIErrorResponse::new(
-                StatusCode::BAD_REQUEST,
-                "category required in path".into(),
-            ))
+            return Err(QueryParameterError {
+                parameter: "category".into(),
+                detail: Some("category required in path".into()),
+            }
+            .into())
         }
     };
     let status = match event.parse::<CategoryStatus>() {
         Ok(Some(status)) => status,
         _ => {
-            return Err(APIErrorResponse::new(
-                StatusCode::BAD_REQUEST,
-                "Expected {\"active\": [true|false] }".into(),
-            ))
+            return Err(BodyParameterError {
+                pointer: "/data/attribute/active".into(),
+                detail: Some("Expected {\"active\": [true|false] }".into()),
+            }
+            .into())
         }
     };
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
 
-    let active = CategoriesRepository { conn: conn }.set_category_active(&category, status.active)?;
+    let active =
+        CategoriesRepository { conn: conn }.set_category_active(&category, status.active)?;
     let api_response =
-        APIGatewayResponse::new(StatusCode::OK, Some(&CategoryStatus { active: active })).unwrap();
+        APIGatewayResponse::new(200, Some(&CategoryStatus { active: active })).unwrap();
 
     Ok(api_response)
 }
@@ -109,7 +112,7 @@ mod tests {
                 assert!(false)
             }
             Ok(resp) => {
-                assert_eq!(resp.status_code(), 200);
+                assert_eq!(resp.status_code, 200);
 
                 let category_status = resp.parse::<CategoryStatus>().unwrap();
                 assert!(category_status.active);

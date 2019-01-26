@@ -13,7 +13,7 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate simple_logger;
 
-use apigateway::*;
+use apigateway::{APIErrorType::*, *};
 use connection::connect_db_with_conn_string;
 use http::StatusCode;
 use lambda::{start, Context};
@@ -24,7 +24,6 @@ use std::error::Error;
 use std::sync::Arc;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    simple_logger::init_with_level(log::Level::Debug).unwrap();
     start(
         |event: APIGatewayEvent, c: Context| lambda_adapter(event, c, &new_question_handler),
         None,
@@ -39,17 +38,13 @@ fn new_question_handler<'a>(
     let question: Question = match event.parse_with_validator(&Question::validate) {
         Ok(Some(question)) => question,
         Ok(None) => {
-            return Err(APIErrorResponse::new(
-                StatusCode::BAD_REQUEST,
-                "question required in body".into(),
-            ))
+            return Err(BodyParameterError {
+                pointer: "/data".into(),
+                detail: Some("'Question' required in body".into()),
+            }
+            .into())
         }
-        Err(e) => {
-            return Err(APIErrorResponse::new(
-                StatusCode::BAD_REQUEST,
-                format!("{}", e),
-            ))
-        }
+        Err(e) => return Err(e),
     };
 
     let conn = Arc::new(connect_db_with_conn_string(&config.connection_string)?);
@@ -62,7 +57,7 @@ fn new_question_handler<'a>(
     let question_repository = QuestionsRepository { conn: conn.clone() };
     let new_question = question_repository.save_question(&question)?;
 
-    let api_response = APIGatewayResponse::new(StatusCode::CREATED, Some(&new_question)).unwrap();
+    let api_response = APIGatewayResponse::new(201, Some(&new_question)).unwrap();
     Ok(api_response)
 }
 
@@ -105,7 +100,7 @@ mod test {
         match new_question_handler(event, config) {
             Ok(_) => assert!(false),
             Err(err) => {
-                print!("TEST. Invalid json. Error: '{}'\n", err.message());
+                print!("TEST. Invalid json. Error: '{:?}'\n", err);
                 assert_eq!(err.status_code(), StatusCode::BAD_REQUEST)
             }
         }
@@ -113,7 +108,6 @@ mod test {
 
     #[test]
     fn test_save_question() {
-        simple_logger::init_with_level(log::Level::Debug).unwrap();
         std::env::set_var("CONN_STRING", std::env::var("TEST_CONN_STRING").unwrap());
 
         let question_json = r#"{
@@ -190,7 +184,10 @@ mod test {
         match new_question_handler(event, config) {
             Ok(_) => assert!(false),
             Err(err) => {
-                print!("TEST. Invalid json. Error: '{}'\n", err.message());
+                print!(
+                    "TEST. Invalid json. Error: '{:?}'\n",
+                    serde_json::to_string(&err)
+                );
                 assert_eq!(err.status_code(), StatusCode::BAD_REQUEST)
             }
         }
