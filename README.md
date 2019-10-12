@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-This repository contains the source code of the Quizzical REST API v3.
+This repository contains the source code of the Quizzical REST API v3. The API is hosted at [`api.quizzicalapp.ml`](https://api.quizzicalapp.ml)
 The API is used by the [Quizzical Android application](https://github.com/w-k-s/Android-Quizzical).
 
 ## 2. History
